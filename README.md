@@ -32,8 +32,8 @@ The codebase is modularized for clarity and maintainability.
 .
 ├── main.py             # Main execution script to run the entire pipeline
 ├── config.py           # Central configuration file for models, datasets, and hyperparameters
-├── data_loader.py     # Handles loading, splitting, and balancing all datasets
-├── model_utils.py     # Defines model creation functions and ensemble logic
+├── data_loader.py      # Handles loading, splitting, and balancing all datasets
+├── model_utils.py      # Defines model creation functions and ensemble logic
 ├── training.py         # Contains the core training and evaluation loops
 ├── utils.py            # Utility functions for logging, plotting, and Early Stopping
 |
