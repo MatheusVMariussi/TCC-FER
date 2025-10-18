@@ -21,7 +21,7 @@ This repository contains a robust and modular framework for training, evaluating
     - Detailed logs for each run.
     - Class distribution plots (before and after balancing).
     - Confusion matrices for each model/dataset pair.
-    - A final summary table comparing the performance of all models.
+    - A final summary table comparing the performance of all models. 
 
 ## Project Structure
 
