@@ -78,16 +78,29 @@ def plot_confusion_matrix(true_labels, predictions, class_names, title, save_pat
     logging.info(f"Confusion matrix saved to: {save_path}")
 
 def plot_cross_dataset_results(cross_results, save_path):
-    datasets = list(cross_results.keys())
-    models = list(next(iter(cross_results.values()))[datasets[0]].keys())
+    """
+    Plot cross-dataset results for merged models.
+    cross_results structure: {model_name: {test_dataset: accuracy}}
+    """
+    models = list(cross_results.keys())
+    datasets = list(next(iter(cross_results.values())).keys()) if cross_results else []
+    
+    if not models or not datasets:
+        logging.warning("No cross-dataset results to plot.")
+        return
+    
     fig, axes = plt.subplots(1, len(models), figsize=(6 * len(models), 5.5), squeeze=False)
     
     for idx, model_name in enumerate(models):
-        data = [[cross_results[train_ds][test_ds].get(model_name, 0.0) for test_ds in datasets] for train_ds in datasets]
-        sns.heatmap(data, annot=True, fmt='.3f', cmap='RdYlGn', xticklabels=datasets, yticklabels=datasets, ax=axes[0, idx], vmin=0, vmax=1)
-        axes[0, idx].set_title(f'{model_name}\n(Train → Test)')
+        # Create data for this model: single row showing performance on each test dataset
+        data = [[cross_results[model_name].get(test_ds, 0.0) for test_ds in datasets]]
+        
+        sns.heatmap(data, annot=True, fmt='.3f', cmap='RdYlGn', 
+                    xticklabels=datasets, yticklabels=['Merged Model'], 
+                    ax=axes[0, idx], vmin=0, vmax=1, cbar_kws={'label': 'Accuracy'})
+        axes[0, idx].set_title(f'{model_name}\n(Merged Training → Test)')
         axes[0, idx].set_xlabel('Test Dataset')
-        axes[0, idx].set_ylabel('Train Dataset')
+        axes[0, idx].set_ylabel('')
         
     plt.tight_layout(pad=3.0)
     plt.savefig(save_path, dpi=300)
