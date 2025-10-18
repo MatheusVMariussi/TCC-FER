@@ -15,8 +15,11 @@ import data_loader
 import model_utils
 import training
 import utils
+import numpy as np
 
 def main():
+    gc.collect()
+    torch.cuda.empty_cache()
     # --- DYNAMIC LOGGING & DIRECTORY SETUP ---
     log_filename = f"execution_log_{time.strftime('%Y%m%d_%H%M%S')}.txt"
     utils.setup_logging(config.OUTPUT_DIR, log_filename)
@@ -43,103 +46,180 @@ def main():
             'test': (test_paths, test_labels)
         }
 
-    # --- 2. Train Models on Each Dataset ---
+    # Guard: if no datasets were loaded successfully, stop early
+    if not datasets_data:
+        logging.error("No datasets were loaded. Please verify dataset paths and ACTIVE_DATASETS in config.py.")
+        return
+        
+    # --- Merge all training datasets into a single combined set ---
+    logging.info(f"\n{'='*80}\nMerging all training datasets into a single unified dataset\n{'='*80}")
+    
+    # --- 2. Train models ---
+    all_train_paths, all_train_labels = [], []
     results, trained_models = {}, {}
     num_classes = len(config.EMOTION_CLASSES)
 
-    for dataset_name, data in datasets_data.items():
-        logging.info(f"\n{'='*80}\nProcessing Dataset for Training: {dataset_name}\n{'='*80}")
-        # ... (Balancing and plotting logic remains unchanged)
-        (train_paths, train_labels) = data['train']
-        (test_paths, test_labels) = data['test']
-        utils.plot_class_distribution(train_labels, config.EMOTION_CLASSES, f"Original Dist - {dataset_name}", 
-                                      os.path.join(config.OUTPUT_DIR, f"{dataset_name}_dist_original.png"))
-        train_paths_b, train_labels_b = data_loader.balance_data_oversampling(train_paths, train_labels)
-        utils.plot_class_distribution(train_labels_b, config.EMOTION_CLASSES, f"Balanced Dist - {dataset_name}",
-                                      os.path.join(config.OUTPUT_DIR, f"{dataset_name}_dist_balanced.png"))
-        train_dataset = data_loader.LazyLoadDataset(train_paths_b, train_labels_b, transform=config.TRANSFORM_TRAIN_HEAVY)
-        test_dataset = data_loader.LazyLoadDataset(test_paths, test_labels, transform=config.TRANSFORM_TEST)
-        
-        results[dataset_name], trained_models[dataset_name] = {}, {}
+    for name, data in datasets_data.items():
+        train_paths, train_labels = data['train']
+        all_train_paths.extend(train_paths)
+        all_train_labels.extend(train_labels)
 
-        for model_name, model_params in config.MODEL_CONFIG.items():
-            torch.cuda.empty_cache()
-            batch_size = model_params['batch_size']
-            logging.info(f"\n--- Processing {model_name} on {dataset_name} with Batch Size: {batch_size} ---")
+    logging.info(f"Total combined training samples: {len(all_train_paths)}")
+
+    # balance the merged training data
+    all_train_paths_b, all_train_labels_b = data_loader.balance_data_oversampling(
+        all_train_paths, 
+        np.array(all_train_labels)
+    )
+
+    utils.plot_class_distribution(
+        all_train_labels_b, 
+        config.EMOTION_CLASSES, 
+        "Combined Dataset (Balanced)", 
+        os.path.join(config.OUTPUT_DIR, "combined_train_distribution.png")
+    )
+
+    # Create one big training dataset
+    merged_train_dataset = data_loader.LazyLoadDataset(
+        all_train_paths_b,
+        all_train_labels_b,
+        transform=config.TRANSFORM_TRAIN_HEAVY
+    )
+
+    # Guard: if the merged dataset is empty, stop early to avoid training errors
+    if len(merged_train_dataset) == 0:
+        logging.error("Merged training dataset is empty after loading/balancing. Check dataset loaders and paths.")
+        return
+
+    for model_name, model_params in config.MODEL_CONFIG.items():
+        torch.cuda.empty_cache()
+        batch_size = model_params['batch_size']
+        logging.info(f"\n--- Training unified model: {model_name} ---")
+
+        model = model_utils.create_model(model_name, num_classes)
+        model_path = os.path.join(config.MODEL_SAVE_DIR, f"merged_{model_name}.pth")
+
+        if os.path.exists(model_path):
+            logging.info(f"Found pre-trained merged model at {model_path}. Loading weights...")
+            model.load_state_dict(torch.load(model_path, map_location=config.DEVICE))
+            training_time = 0
+            history = {}
+        else:
+            train_loader = DataLoader(merged_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
             
-            model = model_utils.create_model(model_name, num_classes)
-            model_path = os.path.join(config.MODEL_SAVE_DIR, f"{dataset_name}_{model_name}.pth")
+            # Create a small validation set from one of the datasets for early stopping
+            val_paths, val_labels = datasets_data[list(datasets_data.keys())[0]]['test']
+            val_dataset = data_loader.LazyLoadDataset(val_paths, val_labels, transform=config.TRANSFORM_TEST)
+            val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
+            
+            start_time = time.time()
+            history = training.train_model(model, train_loader, val_loader)
+            training_time = time.time() - start_time
 
-            # --- CHECK, LOAD, OR TRAIN-AND-SAVE LOGIC (NEW) ---
-            if os.path.exists(model_path):
-                logging.info(f"Found pre-trained model at {model_path}. Loading weights...")
-                model.load_state_dict(torch.load(model_path, map_location=config.DEVICE))
-                training_time = 0
-                history = {} # No history available for pre-trained models
-            else:
-                logging.info(f"No pre-trained model found. Starting training...")
-                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-                test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
-                
-                start_time = time.time()
-                history = training.train_model(model, train_loader, test_loader)
-                training_time = time.time() - start_time
-                
-                logging.info(f"Training complete. Saving model to {model_path}")
-                torch.save(model.state_dict(), model_path)
-            # --- END OF NEW LOGIC ---
+            logging.info(f"Training complete. Saving merged model to {model_path}")
+            torch.save(model.state_dict(), model_path)
 
-            logging.info(f"Evaluating {model_name}...")
-            # The test_loader is now created inside the else block, let's define it for evaluation
-            eval_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
-            acc, preds, true_lbls = training.evaluate_model(model, eval_loader, use_tta=False)
-            acc_tta, preds_tta, _ = training.evaluate_model(model, eval_loader, use_tta=True)
-            logging.info(f"{model_name} | Accuracy: {acc:.4f} | Accuracy (TTA): {acc_tta:.4f}")
+        # Evaluate the merged model on each dataset’s test split
+        model_results = {}
+        for dataset_name, data in datasets_data.items():
+            test_paths, test_labels = data['test']
+            test_dataset = data_loader.LazyLoadDataset(test_paths, test_labels, transform=config.TRANSFORM_TEST)
+            test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
-            results[dataset_name][model_name] = {
-                'accuracy': acc, 'accuracy_tta': acc_tta,
-                'training_time': training_time, 'history': history
-            }
-            trained_models[dataset_name][model_name] = {'model': model}
+            acc, preds, true_lbls = training.evaluate_model(model, test_loader, use_tta=False)
+            acc_tta, preds_tta, _ = training.evaluate_model(model, test_loader, use_tta=True)
 
-            logging.info("\n" + classification_report(true_lbls, preds_tta, target_names=config.EMOTION_CLASSES, digits=3))
-            utils.plot_confusion_matrix(true_lbls, preds_tta, config.EMOTION_CLASSES, 
-                                        f'CM {model_name} on {dataset_name} (TTA)',
-                                        os.path.join(config.OUTPUT_DIR, f"{dataset_name}_{model_name}_cm_TTA.png"))
+            logging.info(f"{model_name} | Tested on {dataset_name} | Acc: {acc:.4f} | Acc (TTA): {acc_tta:.4f}")
+
+            model_results[dataset_name] = {'acc': acc, 'acc_tta': acc_tta}
+            utils.plot_confusion_matrix(
+                true_lbls, preds_tta, config.EMOTION_CLASSES,
+                f'CM {model_name} on {dataset_name} (Merged Model, TTA)',
+                os.path.join(config.OUTPUT_DIR, f"merged_{model_name}_{dataset_name}_cm_TTA.png")
+            )
+
+        results[model_name] = model_results
+        trained_models[model_name] = model
         
-        del train_dataset, test_dataset, model
+        del test_dataset, test_loader
         gc.collect()
         torch.cuda.empty_cache()
 
-    # --- 3. Cross-Dataset & Ensemble Evaluation ---
+    # --- 3. Cross-Dataset Evaluation (Merged Models) ---
     active_datasets = list(datasets_data.keys())
-    cross_results = {train_ds: {test_ds: {} for test_ds in active_datasets} for train_ds in active_datasets}
+    cross_results = {model_name: {test_ds: 0.0 for test_ds in active_datasets} for model_name in trained_models.keys()}
 
-    logging.info("\n" + "="*80 + "\nCross-Dataset Evaluation\n" + "="*80)
-    for train_ds in active_datasets:
+    logging.info("\n" + "="*80 + "\nCross-Dataset Evaluation (Merged Models)\n" + "="*80)
+    for model_name, model in trained_models.items():
+        logging.info(f"\nEvaluating merged model: {model_name} on all test datasets...")
+        batch_size = config.MODEL_CONFIG[model_name]['batch_size']
+        
         for test_ds in active_datasets:
-            logging.info(f"\nEvaluating models from {train_ds} on {test_ds} data...")
             test_paths, test_labels = datasets_data[test_ds]['test']
             test_dataset = data_loader.LazyLoadDataset(test_paths, test_labels, transform=config.TRANSFORM_TEST)
+            test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
             
-            for model_name, model_info in trained_models[train_ds].items():
-                batch_size = config.MODEL_CONFIG[model_name]['batch_size']
-                test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-                acc, _, _ = training.evaluate_model(model_info['model'], test_loader)
-                cross_results[train_ds][test_ds][model_name] = acc
-                logging.info(f"  {model_name}: {acc:.4f}")
+            acc, _, _ = training.evaluate_model(model, test_loader, use_tta=False)
+            cross_results[model_name][test_ds] = acc
+            logging.info(f"  {model_name} on {test_ds}: {acc:.4f}")
+            
+            del test_dataset, test_loader
+        
+        gc.collect()
+        torch.cuda.empty_cache()
 
     utils.plot_cross_dataset_results(cross_results, os.path.join(config.OUTPUT_DIR, 'cross_dataset_evaluation.png'))
     
-    # --- Final Summary ---
-    logging.info("\n" + "="*80 + "\nFinal Results Summary\n" + "="*80)
+    # --- 4. Ensemble Evaluation (Merged Models) ---
+    logging.info("\n" + "="*80 + "\nEnsemble Evaluation (All Merged Models Combined)\n" + "="*80)
+    ensemble_results = {}
+    
+    # Create ensemble from all trained merged models
+    all_models = list(trained_models.values())
+    ensemble = model_utils.EnsembleModel(all_models, strategy='soft')
+    
+    for dataset_name, data in datasets_data.items():
+        test_paths, test_labels = data['test']
+        test_dataset = data_loader.LazyLoadDataset(test_paths, test_labels, transform=config.TRANSFORM_TEST)
+        # Use batch size from first model (they should all be the same anyway)
+        batch_size = config.MODEL_CONFIG[list(config.MODEL_CONFIG.keys())[0]]['batch_size']
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
+        
+        logging.info(f"\nEvaluating ensemble on {dataset_name}...")
+        acc, preds, true_lbls = ensemble.predict(test_loader)
+        logging.info(f"Ensemble Accuracy on {dataset_name}: {acc:.4f}")
+        
+        ensemble_results[dataset_name] = {'accuracy': acc}
+        
+        # Plot confusion matrix for ensemble
+        utils.plot_confusion_matrix(
+            true_lbls, preds, config.EMOTION_CLASSES,
+            f'Ensemble Confusion Matrix on {dataset_name}',
+            os.path.join(config.OUTPUT_DIR, f"ensemble_{dataset_name}_cm.png")
+        )
+        
+        # Classification report
+        logging.info("\n" + classification_report(true_lbls, preds, target_names=config.EMOTION_CLASSES, digits=3))
+        
+        del test_dataset, test_loader
+        gc.collect()
+        torch.cuda.empty_cache()
+    
+    # Log ensemble summary
+    logging.info("\n" + "="*80 + "\nEnsemble Results Summary\n" + "="*80)
+    for dataset_name, metrics in ensemble_results.items():
+        logging.info(f"{dataset_name}: {metrics['accuracy']:.4f}")
+    
+    # --- 5. Final Summary ---
+    logging.info("\n" + "="*80 + "\nFinal Results Summary (Merged Models)\n" + "="*80)
     summary_data = []
-    for ds, res_dict in results.items():
-        for mdl, res in res_dict.items():
+    for model_name, test_results in results.items():
+        for dataset_name, metrics in test_results.items():
             summary_data.append({
-                'Dataset': ds, 'Model': mdl,
-                'Accuracy': res['accuracy'], 'Accuracy (TTA)': res['accuracy_tta'],
-                'Training Time (s)': int(res['training_time'])
+                'Model': model_name,
+                'Tested on': dataset_name,
+                'Accuracy': f"{metrics['acc']:.4f}",
+                'Accuracy (TTA)': f"{metrics['acc_tta']:.4f}"
             })
     summary_df = pd.DataFrame(summary_data)
     logging.info("\n" + summary_df.to_string(index=False))
