@@ -26,8 +26,8 @@ ACTIVE_DATASETS = {
 # This is where you optimize GPU usage per model.
 MODEL_CONFIG = {
     'densenet121': {'batch_size': 96},
-    'resnet50': {'batch_size': 144},
-    'efficientnet_b0': {'batch_size': 144},
+    'resnet50': {'batch_size': 128},
+    'efficientnet_b0': {'batch_size': 128},
     # 'convnext_tiny': {'batch_size': 128}, # Example for adding more
 }
 
