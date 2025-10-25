@@ -3,62 +3,88 @@
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-orange.svg)
 
-This repository contains a robust and modular framework for training, evaluating, and comparing deep learning models for Facial Emotion Recognition (FER). The architecture is designed for experimentation, allowing for easy integration of new datasets and models, and provides powerful features like cross-dataset evaluation and Test-Time Augmentation (TTA).
+This repository contains a robust and modular framework for training, evaluating, and comparing deep learning models for Facial Emotion Recognition (FER). The architecture is designed for experimentation, allowing for easy integration of new datasets and models, and provides powerful features like cross-dataset evaluation, ensemble methods, and comprehensive error analysis.
 
-## Key Features
+## ✨ Key Features
 
-- **Multi-Dataset Support:** Currently supports FER2013, RAF-DB, and ExpW. The `data_loader.py` is structured to easily add more datasets.
-- **Multiple Model Architectures:** Pre-configured for DenseNet121, ResNet50, and EfficientNet-B0 using `timm` and `torchvision`. Adding new models is trivial.
-- **Automated Workflow:** A single command trains all specified models on all active datasets, saves the weights, and generates all evaluation assets.
-- **Intelligent Training:**
-    - **Pre-trained Model Caching:** Automatically skips training if a model's weights are already saved, loading them for evaluation instead.
-    - **Early Stopping:** Prevents overfitting and saves time by monitoring validation accuracy.
-    - **Data Balancing:** Uses Random Oversampling to combat class imbalance in training data.
-- **Advanced Evaluation:**
-    - **Test-Time Augmentation (TTA):** Improves prediction accuracy by averaging results over multiple augmented versions of test images.
-    - **Cross-Dataset Evaluation:** Generates a heatmap to rigorously test model generalization by training on one dataset and evaluating on another.
-- **Comprehensive Reporting:** Automatically generates and saves:
-    - Detailed logs for each run.
-    - Class distribution plots (before and after balancing).
-    - Confusion matrices for each model/dataset pair.
-    - A final summary table comparing the performance of all models. 
+### 🎯 Training Strategies
+- **Individual Training:** Train separate models for each dataset
+- **Merged Training:** Train models on combined datasets
+- **Hybrid Mode:** Execute both strategies and compare results
 
-## Project Structure
+### 📊 Multi-Dataset Support
+- Currently supports **FER2013**, **RAF-DB**, and **ExpW**
+- Easy integration of new datasets via `data_loader.py`
+- Automatic data balancing with Random Oversampling
 
-The codebase is modularized for clarity and maintainability.
+### 🧠 Multiple Model Architectures
+- Pre-configured for **DenseNet121**, **ResNet50**, and **EfficientNet-B0**
+- Uses `timm` and `torchvision` for pre-trained weights
+- Simple configuration to add new architectures
+
+### 🚀 Intelligent Training Pipeline
+- **Pre-trained Model Detection:** Automatically skips training if weights exist
+- **Early Stopping:** Prevents overfitting and saves training time
+- **Automatic Memory Management:** GPU cache clearing and garbage collection
+- **Batch Size Optimization:** Per-model configuration for optimal GPU usage
+
+### 📈 Advanced Evaluation
+- **Test-Time Augmentation (TTA):** Improves prediction accuracy
+- **Cross-Dataset Evaluation:** Tests generalization across different domains
+- **Ensemble Methods:** Combines multiple models (soft/hard voting)
+- **Normalized Confusion Matrices:** Shows proportions (0-1) for easy comparison
+
+### 🔍 Comprehensive Error Analysis
+- **Per-Class Error Rates:** Visual breakdown with color coding
+- **Top Confused Pairs:** Identifies critical misclassifications
+- **Error Distribution Matrix:** Heatmap of confusion patterns
+- **Statistical Summary:** Best/worst classes and critical confusions
+
+### 📁 Organized Output Structure
+- **Automatic PDF Generation:** High-quality plots ready for academic papers
+- **Structured Directories:** Separate folders for each output type
+- **CSV Export:** Results table for easy integration with LaTeX/Excel
+- **Timestamped Logs:** Detailed execution history
+
+## 🗂️ Project Structure
 
 ```
-
 .
-├── main.py             # Main execution script to run the entire pipeline
-├── config.py           # Central configuration file for models, datasets, and hyperparameters
-├── data_loader.py      # Handles loading, splitting, and balancing all datasets
-├── model_utils.py      # Defines model creation functions and ensemble logic
-├── training.py         # Contains the core training and evaluation loops
-├── utils.py            # Utility functions for logging, plotting, and Early Stopping
-|
-├── fer2013/            # Directory for the FER2013 dataset
-├── rafdb/              # Directory for the RAF-DB dataset
-├── expw/               # Directory for the Expression in-the-Wild dataset
-|
-└── saidas/             # Output directory for logs, plots, and saved models
-├── saved_models/
-└── ...plots and logs
+├── main.py                 # Main execution script - unified pipeline
+├── config.py               # Central configuration (models, datasets, hyperparameters)
+├── data_loader.py          # Dataset loading, splitting, and balancing
+├── model_utils.py          # Model creation and ensemble logic
+├── training.py             # Training and evaluation loops
+├── utils.py                # Plotting, logging, and error analysis utilities
+│
+├── fer2013/                # FER2013 dataset directory
+├── rafdb/                  # RAF-DB dataset directory
+├── expw/                   # Expression in-the-Wild dataset directory
+│
+└── saidas/                 # Output directory (auto-generated)
+    ├── execution_log_*.txt
+    ├── comprehensive_results.csv
+    ├── saved_models/
+    ├── class_distributions/
+    ├── confusion_matrices/
+    │   └── TTA/
+    ├── error_analysis/
+    ├── cross_dataset/
+    └── ensemble_results/
+```
 
-````
-
-## Setup and Installation
+## 📦 Setup and Installation
 
 ### 1. Clone the Repository
 
 ```bash
-git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
-cd your-repo-name
-````
+git https://github.com/MatheusVMariussi/TCC-FER.git
+cd TCC-FER
+```
 
-### 2\. Install Dependencies
+### 2. Install Dependencies
 
-Create a file named `requirements.txt` with the following content:
+Create a `requirements.txt` file with the following content:
 
 ```txt
 torch
@@ -73,7 +99,7 @@ imbalanced-learn
 numpy
 ```
 
-Then, install the packages:
+Then install:
 
 ```bash
 pip install -r requirements.txt
@@ -81,101 +107,185 @@ pip install -r requirements.txt
 
 ### 3. Dataset Structure
 
-This framework expects a specific directory structure for the datasets. Create the folders in the root of the project as shown below:
+This framework expects the following directory structure:
 
-  - **FER2013:**
-    ```
-    ./fer2013/
-    ├── train/
-    |   ├── angry/
-    |   ├── disgust/
-    |   └── ...
-    └── test/
-        ├── angry/
-        ├── disgust/
-        └── ...
-    ```
-  - **RAF-DB:**
-    ```
-    ./rafdb/DATASET/
-    ├── train/
-    |   ├── 1/
-    |   ├── 2/
-    |   └── ...
-    └── test/
-        ├── 1/
-        ├── 2/
-        └── ...
-    ```
-  - **Expression in-the-Wild (ExpW):**
-    ```
-    ./expw/Expw-F/
+#### **FER2013:**
+```
+./fer2013/
+├── train/
+│   ├── angry/
+│   ├── disgust/
+│   ├── fear/
+│   ├── happy/
+│   ├── sad/
+│   ├── surprise/
+│   └── neutral/
+└── test/
     ├── angry/
-    ├── disgust/
-    ├── fear/
-    ├── happy/
-    ├── sad/
-    ├── surprise/
-    └── neutral/
-    ```
+    └── ...
+```
 
-## How to Use
+#### **RAF-DB:**
+```
+./rafdb/DATASET/
+├── train/
+│   ├── 1/  (surprise)
+│   ├── 2/  (fear)
+│   ├── 3/  (disgust)
+│   ├── 4/  (happy)
+│   ├── 5/  (sad)
+│   ├── 6/  (angry)
+│   └── 7/  (neutral)
+└── test/
+    └── ...
+```
 
-### 1\. Configure Your Experiment
+#### **Expression in-the-Wild (ExpW):**
+```
+./expw/Expw-F/
+├── angry/
+├── disgust/
+├── fear/
+├── happy/
+├── sad/
+├── surprise/
+└── neutral/
+```
 
-The primary control file is `config.py`. Open it to customize your run:
+## 🚀 How to Use
 
-  - **Activate Datasets:** Add or remove datasets from the `ACTIVE_DATASETS` dictionary.
-    ```python
-    ACTIVE_DATASETS = {
-        'RAF-DB': 'load_rafdb',
-        'ExpW': 'load_expw',
-        # 'FER2013': 'load_fer2013', # Deactivated by commenting out
-    }
-    ```
-  - **Configure Models:** Add, remove, or modify models and their specific batch sizes in the `MODEL_CONFIG` dictionary to optimize GPU memory usage.
-    ```python
-    MODEL_CONFIG = {
-        'densenet121': {'batch_size': 96},
-        'resnet50': {'batch_size': 144},
-        # 'efficientnet_b0': {'batch_size': 144},
-    }
-    ```
-  - **Adjust Hyperparameters:** Change `EPOCHS`, `LEARNING_RATE`, and `PATIENCE` as needed.
+### 1. Configure Your Experiment
 
-### 2\. Run the Pipeline
+Open `config.py` and customize your settings:
 
-Execute the main script from your terminal. The script will handle everything automatically.
+#### **Choose Training Strategy:**
+```python
+# Train only individual models (one per dataset)
+TRAINING_STRATEGY = 'individual'
+
+# Train only merged model (all datasets combined)
+TRAINING_STRATEGY = 'merged'
+
+# Train both and compare (RECOMMENDED)
+TRAINING_STRATEGY = 'both'
+```
+
+#### **Select Active Datasets:**
+```python
+ACTIVE_DATASETS = {
+    'RAF-DB': 'load_rafdb',
+    'ExpW': 'load_expw',
+    'FER2013': 'load_fer2013',  # Comment out to deactivate
+}
+```
+
+#### **Configure Models:**
+```python
+MODEL_CONFIG = {
+    'densenet121': {'batch_size': 96},
+    'resnet50': {'batch_size': 128},
+    'efficientnet_b0': {'batch_size': 128},
+    # Add more models here
+}
+```
+
+#### **Output Settings:**
+```python
+PLOT_FORMAT = 'pdf'      # 'pdf' or 'png'
+NORMALIZE_CM = True      # Normalize confusion matrices (0-1)
+```
+
+#### **Hyperparameters:**
+```python
+EPOCHS = 100             # Max epochs (early stopping may stop sooner)
+LEARNING_RATE = 0.001
+PATIENCE = 5             # Early stopping patience
+```
+
+### 2. Run the Pipeline
 
 ```bash
 python main.py
 ```
 
-### 3\. Review the Outputs
+The script will automatically:
+- ✅ Load and balance datasets
+- ✅ Train models (or load existing weights)
+- ✅ Evaluate with and without TTA
+- ✅ Generate confusion matrices
+- ✅ Perform error analysis
+- ✅ Cross-dataset evaluation
+- ✅ Ensemble evaluation
+- ✅ Export comprehensive results table
 
-All results are saved to the `saidas/` directory.
+### 3. Review the Outputs
 
-  - **Logs:** A timestamped log file (`execution_log_...txt`) will contain detailed information about each step.
-  - **Saved Models:** Trained model weights (`.pth` files) are stored in `saidas/saved_models/`.
-  - **Plots:** You will find PNG images for:
-      - Class distributions for each dataset (`<dataset>_dist_original.png`, `<dataset>_dist_balanced.png`).
-      - Confusion matrices for each trained model (`<dataset>_<model>_cm_TTA.png`).
-      - A summary heatmap of the cross-dataset evaluation (`cross_dataset_evaluation.png`).
-  - **Final Summary:** The console and log file will display a clean summary table of all model accuracies and training times at the end of the run.
+All results are saved to `saidas/` with the following structure:
 
-## Example Outputs
+```
+saidas/
+├── execution_log_20241025_143022.txt       # Detailed log
+├── comprehensive_results.csv               # Main results table
+│
+├── saved_models/                           # Trained model weights
+│   ├── RAF-DB_densenet121.pth
+│   ├── merged_densenet121.pth
+│   └── ...
+│
+├── class_distributions/                    # Dataset distributions
+│   ├── RAF-DB_dist_original.pdf
+│   ├── RAF-DB_dist_balanced.pdf
+│   └── merged_train_distribution.pdf
+│
+├── confusion_matrices/
+│   └── TTA/                                # All TTA confusion matrices
+│       ├── RAF-DB_densenet121_cm_TTA.pdf
+│       ├── merged_densenet121_RAF-DB_cm_TTA.pdf
+│       └── ...
+│
+├── error_analysis/                         # Detailed error analysis
+│   ├── RAF-DB_densenet121_error_analysis.pdf
+│   ├── merged_densenet121_RAF-DB_error_analysis.pdf
+│   └── ...
+│
+├── cross_dataset/                          # Generalization tests
+│   ├── cross_dataset_individual.pdf
+│   └── cross_dataset_merged.pdf
+│
+└── ensemble_results/                       # Ensemble evaluations
+    ├── ensemble_individual_RAF-DB_cm.pdf
+    ├── ensemble_individual_RAF-DB_error.pdf
+    ├── ensemble_merged_RAF-DB_cm.pdf
+    └── ensemble_merged_RAF-DB_error.pdf
+```
 
-The framework automatically generates key visualizations to analyze model performance.
+## 📊 Understanding the Outputs
 
-**Confusion Matrix (TTA)**
-*Shows detailed per-class performance for a given model on a test set.*
+### **Confusion Matrix (Normalized)**
+Shows prediction accuracy as proportions (0-1):
+- **Diagonal:** Correct predictions (higher = better)
+- **Off-diagonal:** Confusions between classes
+- Values sum to 1.0 per row (true label)
 
-**Cross-Dataset Evaluation Heatmap**
-*Provides critical insights into how well models generalize to unseen data from different domains.*
+### **Error Analysis Plot**
+Four-panel visualization:
+1. **Top:** Per-class error rates (color-coded by severity)
+2. **Middle:** Top 10 most confused class pairs
+3. **Bottom-Left:** Error distribution heatmap
+4. **Bottom-Right:** Statistical summary
 
-## Future Work
+### **Cross-Dataset Evaluation**
+Heatmap showing model generalization:
+- **Rows:** Training dataset
+- **Columns:** Test dataset
+- **Cells:** Accuracy (darker = better)
+- **Blue boxes:** Same dataset (expected high accuracy)
 
-  - **Create a "Mega data set:** Create a dataset that combine all the others datasets, as a way of having a dataset that has all variants of data, like color in-the-wild images, gray lab-created images, etc.
-  - **Add More Models:** Integrate newer architectures like ViT (Vision Transformers) or ConvNeXt variants.
-  - **Advanced Augmentation:** Experiment with more sophisticated augmentation techniques like Mixup or CutMix.
-  - **Hyperparameter Tuning:** Integrate a library like Optuna or Ray Tune to systematically find the best hyperparameters.
+### **Comprehensive Results Table (CSV)**
+Complete results in tabular format:
+- Section 1: Individual model accuracies
+- Section 2: Merged model accuracies
+- Section 3: Individual ensemble results
+- Section 4: Merged ensemble results
+
+**⭐ If this framework helped your research, please consider starring the repository!**

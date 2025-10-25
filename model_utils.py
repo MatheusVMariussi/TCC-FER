@@ -1,5 +1,3 @@
-# model_utils.py
-
 import torch
 import torch.nn as nn
 import torchvision.models as models
@@ -8,10 +6,9 @@ import timm
 import numpy as np
 from collections import Counter
 
-import config # Import config for DEVICE
+import config
 
 def create_model(model_name, num_classes):
-    """Creates a pre-trained model."""
     if model_name == 'resnet50':
         model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
