@@ -1,5 +1,3 @@
-# training.py
-
 import logging
 import torch
 import torch.nn as nn
@@ -7,11 +5,10 @@ import torch.optim as optim
 from sklearn.metrics import accuracy_score
 from PIL import Image
 
-import config # Import config for DEVICE and TTA transforms
-from utils import EarlyStopping # Import from utils
+import config
+from utils import EarlyStopping
 
 def tensor_to_pil(tensor, mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225]):
-    """Converts a tensor back to a PIL image for TTA."""
     if tensor.is_cuda:
         tensor = tensor.cpu()
     t = tensor.clone()
@@ -47,7 +44,7 @@ def train_model(model, train_loader, val_loader):
         train_acc = 100 * correct_train / total_train
         
         val_acc, _, _ = evaluate_model(model, val_loader, use_tta=False)
-        val_acc *= 100 # Convert to percentage for logging/history
+        val_acc *= 100 # Convert to percentage for logging
         
         history['train_loss'].append(train_loss)
         history['train_acc'].append(train_acc)

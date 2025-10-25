@@ -1,5 +1,3 @@
-# data_loader.py
-
 import os
 import logging
 import numpy as np
@@ -41,10 +39,8 @@ class LazyLoadDataset(Dataset):
 
 
 def balance_data_oversampling(images_or_paths, labels):
-    """Balances the dataset using Random Oversampling. If input is empty, returns it unchanged."""
     logging.info(f"Balanceando dados com RandomOversampler...")
     
-    # CORRECTED CHECK: Use the unambiguous NumPy check for an empty array.
     if labels is None or labels.size == 0:
         logging.warning("Aviso: o array de rótulos está vazio. Pulando oversampling.")
         return images_or_paths, np.array(labels) # Return an empty numpy array for labels
@@ -57,7 +53,6 @@ def balance_data_oversampling(images_or_paths, labels):
     if is_paths:
         X = np.array(images_or_paths).reshape(-1, 1)
     else:
-        # This branch was not in your original code, but is good practice.
         original_shape = images_or_paths.shape
         X = images_or_paths.reshape(original_shape[0], -1)
 
